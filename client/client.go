@@ -3,7 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"net"
 	"os"
 	"strconv"
@@ -23,6 +23,7 @@ var REQUEST_SERVER = "REQUEST_SERVER"
 var REQUEST_CLIENT = "REQUEST_CLIENT"
 var SEND_TO_SERVER = "SEND_TO_SERVER"
 var SENT_TO_CLIENT = "SEND_TO_CLIENT"
+var ERROR = "ERROR"
 
 func incomingHandler(sock net.Conn) {
 
@@ -32,79 +33,64 @@ func incomingHandler(sock net.Conn) {
 		header := splitMessage[0]
 
 		if header == REQUEST_CLIENT {
+
 			fileName := splitMessage[1]
 			receiverSockId := splitMessage[2]
 			fmt.Println(serverMsg)
-			sendSocketMessage(SEND_TO_SERVER+"@"+receiverSockId, sock)
+			receiverSockId = strings.Trim(receiverSockId, "\n")
+			fileName = strings.Trim(fileName, "\n")
+
+			fmt.Println("Server Requesting " + fileName)
 
 			filePath := fileNameToLocation[fileName]
+			bytes, err := ioutil.ReadFile(filePath)
 
-			file, err := os.Open(filePath)
+			strBytes := fmt.Sprintf("%v", bytes)
+			strBytes = strings.Trim(strBytes, "]")
+			strBytes = strings.Trim(strBytes, "[")
+			strBytes = strings.Trim(strBytes, " ")
+
+			sendSocketMessage(SEND_TO_SERVER+"@"+receiverSockId+"@"+fileName+"@"+strBytes, sock)
 
 			if err != nil {
 				fmt.Println(err)
 
 			}
 
-			fileInfo, err := file.Stat()
-
-			if err != nil {
-				fmt.Println(err)
-
-			}
-
-			fileSize := int(fileInfo.Size())
-
-			fmt.Println("Sending filename and size")
-
-			sendSocketMessage(strconv.Itoa(fileSize), sock)
-			sendSocketMessage(fileName, sock)
-
-			sendBuffer := make([]byte, BUFFERSIZE)
-			fmt.Println("Start sending file")
-
-			for {
-				_, err = file.Read(sendBuffer)
-				if err == io.EOF {
-					break
-				}
-				sock.Write(sendBuffer)
-			}
-			file.Close()
 			fmt.Println("File has been sent")
 
 		} else if header == LIST_ALL {
 			files := splitMessage[1]
-			listFiles = strings.Split(files, "*")
+			files = strings.Trim(files, "\n")
+			if files == "" {
+				listFiles = []string{}
+			} else {
+				listFiles = strings.Split(files, "*")
+			}
 
 		} else if header == SENT_TO_CLIENT {
-			fmt.Println("Here")
 
-			tempFileSize, _ := bufio.NewReader(sock).ReadString('\n')
-			fileSize, _ := strconv.ParseInt(tempFileSize, 10, 64)
+			fmt.Println("\nReading")
 
-			FileName, _ := bufio.NewReader(sock).ReadString('\n')
-			FileName = strings.Trim(FileName, "\n")
-			newFile, err := os.Create("akayou_" + FileName)
+			FileName := strings.Trim(splitMessage[1], "\n")
+			strFile := strings.Trim(splitMessage[2], "\n")
 
-			if err != nil {
-				fmt.Println("  Error creating file" + FileName)
+			strBytes := strings.Split(strFile, " ")
+
+			var newBytes []byte
+
+			for b := range strBytes {
+				newB, _ := strconv.Atoi(strBytes[b])
+				newBytes = append(newBytes, byte(newB))
 			}
 
-			defer newFile.Close()
+			ioutil.WriteFile(FileName, newBytes, 0666)
 
-			var receivedBytes int64
-
-			for {
-				if (fileSize - receivedBytes) < BUFFERSIZE {
-					io.CopyN(newFile, sock, (fileSize - receivedBytes))
-					sock.Read(make([]byte, (receivedBytes+BUFFERSIZE)-fileSize))
-					break
-				}
-				io.CopyN(newFile, sock, BUFFERSIZE)
-				receivedBytes += BUFFERSIZE
-			}
 			fmt.Println("\nFile Received.")
+
+		} else if header == ERROR {
+			errMessage := splitMessage[1]
+			fmt.Println("Error occured. " + errMessage)
 		}
 	}
 }
@@ -146,27 +132,28 @@ func outgoingHandler(sock net.Conn) {
 			time.Sleep(2 * time.Second)
 
 			if len(listFiles) == 0 {
-				fmt.Println("No files shared so far")
+				fmt.Println("\n\nNo files shared so far")
 			} else {
 				fmt.Println("\n\n\t\t List of files")
 				fmt.Println("No.\tFileName")
 
 				for i := 0; i < len(listFiles); i++ {
-					fmt.Println(strconv.Itoa(i) + "\t" + listFiles[i])
+					fmt.Println(strconv.Itoa(i+1) + "\t" + listFiles[i])
 				}
 
 				fmt.Print("Enter file row > ")
 				fileIndexStr, _ := bufio.NewReader(os.Stdin).ReadString('\n')
-				fileIndex, _ := strconv.Atoi(fileIndexStr)
+				fileIndex, _ := strconv.Atoi(strings.Trim(fileIndexStr, "\n"))
 
-				if fileIndex >= 0 && fileIndex < len(listFiles) {
-					fileName := strings.Trim(listFiles[fileIndex], "\n")
+				if fileIndex >= 1 && fileIndex <= len(listFiles) {
+					fileName := strings.Trim(listFiles[fileIndex-1], "\n")
 
 					if fileNameToLocation[fileName] != "" {
 						fmt.Println("File is available loacally.")
 					} else {
-						sendSocketMessage(REQUEST_SERVER+"@"+fileName, sock)
 
+						sendSocketMessage(REQUEST_SERVER+"@"+fileName, sock)
+						fmt.Println("Requesting " + fileName)
 					}
 
 				}
@@ -179,9 +166,11 @@ func outgoingHandler(sock net.Conn) {
 }
 
 func sendSocketMessage(message string, sock net.Conn) {
-	writer := bufio.NewWriter(sock)
-	writer.WriteString(message + "\n")
-	writer.Flush()
+	// writer := bufio.NewWriter(sock)
+	// writer.WriteString(message + "\n")
+	// writer.Flush()
+
+	fmt.Fprintf(sock, message+"\n")
 
 }
 
