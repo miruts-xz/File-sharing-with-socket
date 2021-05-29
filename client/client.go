@@ -40,10 +40,16 @@ func incomingHandler(sock net.Conn) {
 			receiverSockId = strings.Trim(receiverSockId, "\n")
 			fileName = strings.Trim(fileName, "\n")
 
-			fmt.Println("Server Requesting " + fileName)
+			fmt.Println("\nServer Requesting " + fileName)
 
 			filePath := fileNameToLocation[fileName]
 			bytes, err := ioutil.ReadFile(filePath)
+
+			if err != nil {
+				fmt.Println(err)
+				sendSocketMessage(ERROR+"@"+"File can't be found", sock)
+				continue
+			}
 
 			strBytes := fmt.Sprintf("%v", bytes)
 			strBytes = strings.Trim(strBytes, "]")
@@ -52,12 +58,7 @@ func incomingHandler(sock net.Conn) {
 
 			sendSocketMessage(SEND_TO_SERVER+"@"+receiverSockId+"@"+fileName+"@"+strBytes, sock)
 
-			if err != nil {
-				fmt.Println(err)
-
-			}
-
-			fmt.Println("File has been sent")
+			fmt.Println("\nFile has been sent")
 
 		} else if header == LIST_ALL {
 			files := splitMessage[1]
@@ -84,13 +85,13 @@ func incomingHandler(sock net.Conn) {
 				newBytes = append(newBytes, byte(newB))
 			}
 
-			ioutil.WriteFile(FileName, newBytes, 0666)
+			ioutil.WriteFile("./downloads/"+FileName, newBytes, 0666)
 
 			fmt.Println("\nFile Received.")
 
 		} else if header == ERROR {
 			errMessage := splitMessage[1]
-			fmt.Println("Error occured. " + errMessage)
+			fmt.Println("\nError occured. " + errMessage)
 		}
 	}
 }
