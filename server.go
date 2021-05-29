@@ -8,9 +8,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
-
 	"sync"
+	"time"
 )
 
 const BUFFERSIZE = 1024
@@ -32,15 +31,20 @@ func incomingHandler(sock net.Conn) {
 
 	for {
 
-		clientMsg, _ := bufio.NewReader(sock).ReadString('\n')
+		clientMsg, error := bufio.NewReader(sock).ReadString('\n')
 		splitMessage := strings.Split(clientMsg, "@")
 		header := splitMessage[0]
+
+		if error != nil {
+			cleanUp(sock)
+			return
+		}
 
 		if header == INDEX { // A client is telling the server the file it wants to share
 			fileName := splitMessage[1]
 			fileName = strings.Trim(fileName, "\n")
 			addFileName(fileName, sock)
-			fmt.Println(fileName + "Added to index")
+			fmt.Println(fileName + " added to index")
 		} else if header == LIST_ALL { // Returns the list of all files available for share
 
 			files := ""
@@ -66,57 +70,23 @@ func incomingHandler(sock net.Conn) {
 
 			} else {
 				//File wasn't cached on server so look it up in the FilNames map
+
+				fileFound := false
+
 				for key := range fileNames {
 
 					if fileName == key {
 
+						fileFound = true
 						fileOwnerSocket := fileNames[key]
-
-						// one := make([]byte, 1)
-						// fileOwnerSocket.SetReadDeadline(time.Now())
-						// if _, err := fileOwnerSocket.Read(one); err == io.EOF {
-
-						// 	fileOwnerSocket.Close()
-						// 	fmt.Println("Socket is closed")
-						// 	//TODO Send an error message to client
-
-						// 	for fn := range fileNames {
-						// 		if fileOwnerSocket == fileNames[fn] {
-						// 			delete(fileNames, fn)
-						// 		}
-						// 	}
-
-						// 	fileOwnerSocket.Close()
-						// 	delete(sockets, socketToId[fileOwnerSocket])
-						// 	delete(socketToId, fileOwnerSocket)
-
-						// 	break
-
-						// }
-
-						// _, err := fileOwnerSocket.Read([]byte{})
-
-						// if err != nil {
-						// 	fmt.Println("Error")
-						// 	log.Println(err)
-						// 	//TODO Send an error message to client
-
-						// 	for fn := range fileNames {
-						// 		if fileOwnerSocket == fileNames[fn] {
-						// 			delete(fileNames, fn)
-						// 		}
-						// 	}
-
-						// 	fileOwnerSocket.Close()
-						// 	delete(sockets, socketToId[fileOwnerSocket])
-						// 	delete(socketToId, fileOwnerSocket)
-
-						// 	break
-						// }
 						fmt.Println("Sending request to file owner")
 						sendSocketMessage(REQUEST_CLIENT+"@"+fileName+"@"+socketToId[sock], fileOwnerSocket)
 						break
 					}
+				}
+
+				if !fileFound {
+					sendSocketMessage(ERROR+"@"+"File owner is not online.", sock)
 				}
 
 			}
@@ -175,21 +145,22 @@ func sendSocketMessage(message string, sock net.Conn) {
 	// writer.WriteString(message + "\n")
 	// writer.Flush()
 
-	_, err := fmt.Fprintf(sock, message+"\n")
+	fmt.Fprintf(sock, message+"\n")
 
-	if err != nil {
-		fmt.Println("Socket is not available.")
-		for fn := range fileNames {
-			if sock == fileNames[fn] {
-				delete(fileNames, fn)
-			}
+}
+func cleanUp(sock net.Conn) {
+
+	sock.Close()
+	fmt.Println("Socket is closed")
+	//TODO Send an error message to client
+
+	for fn := range fileNames {
+		if sock == fileNames[fn] {
+			delete(fileNames, fn)
 		}
-
-		sock.Close()
-		delete(sockets, socketToId[sock])
-		delete(socketToId, sock)
-
 	}
+	delete(sockets, socketToId[sock])
+	delete(socketToId, sock)
 
 }
 
@@ -218,5 +189,4 @@ func main() {
 	go acceptSockets()
 
 	wg.Wait()
-
 }
