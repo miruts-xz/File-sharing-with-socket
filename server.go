@@ -112,18 +112,6 @@ func incomingHandler(sock net.Conn) {
 					sendSocketMessage(ERROR+FLAG_SEPARATOR+"File owner is not online.", sock)
 				}
 
-				// for key := range fileNames {
-
-				// 	if fileName == key {
-
-				// 		fileFound = true
-				// 		fileOwnerSocket := fileNames[key]
-				// 		fmt.Println("Sending request to file owner")
-				// 		sendSocketMessage(REQUEST_CLIENT+FLAG_SEPARATOR+fileName+FLAG_SEPARATOR+socketToUsername[sock], fileOwnerSocket)
-				// 		break
-				// 	}
-				// }
-
 			}
 		} else if header == SEND_TO_SERVER {
 
@@ -190,9 +178,6 @@ func addFileName(fileName string, sock net.Conn) {
 }
 
 func sendSocketMessage(message string, sock net.Conn) {
-	// writer := bufio.NewWriter(sock)
-	// writer.WriteString(message + "\n")
-	// writer.Flush()
 
 	fmt.Fprintf(sock, message+"\n")
 
@@ -201,7 +186,6 @@ func cleanUp(sock net.Conn) {
 
 	sock.Close()
 	fmt.Println("Socket is closed")
-	//TODO Send an error message to client
 
 	delete(sockets, socketToUsername[sock])
 	delete(socketToUsername, sock)
@@ -228,7 +212,7 @@ func main() {
 	bytes, error := ioutil.ReadFile(JSON_USER_INFO)
 
 	if error != nil {
-		fmt.Println("An error occured, couldn't get previously shared files.")
+		fmt.Println("An error occured, couldn't get users info.")
 	} else {
 		json.Unmarshal(bytes, &userInfo)
 	}
