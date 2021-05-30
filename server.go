@@ -12,8 +12,6 @@ import (
 	"sync"
 )
 
-const BUFFERSIZE = 1024
-
 var sockets map[string]net.Conn
 var socketToUsername map[net.Conn]string
 var fileNames map[string]string
