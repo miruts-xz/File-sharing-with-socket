@@ -96,8 +96,11 @@ func incomingHandler(sock net.Conn) {
 				newB, _ := strconv.Atoi(strBytes[b])
 				newBytes = append(newBytes, byte(newB))
 			}
-
-			ioutil.WriteFile("./downloads/"+FileName, newBytes, 0666)
+			p, _ := os.Getwd()
+			fmt.Println(p)
+			//fmt.Println(newBytes)
+			fmt.Println(p + "\\client\\downloads\\" + FileName)
+			ioutil.WriteFile(p+"\\client\\downloads\\"+FileName, newBytes, 0666)
 
 			fmt.Println("\nFile Received.")
 
@@ -189,7 +192,7 @@ func promtAfterLogin(sock net.Conn) {
 
 			var fileName string
 
-			splitPath := strings.Split(filePath, "/")
+			splitPath := strings.Split(filePath, "\\")
 			if len(splitPath) == 1 {
 				fileName = splitPath[0]
 			} else {
@@ -230,7 +233,7 @@ func promtAfterLogin(sock net.Conn) {
 				fileName := strings.Trim(listFiles[fileIndex-1], "\n")
 
 				if fileNameToLocation[fileName] != "" {
-					fmt.Println("File is available loacally.")
+					fmt.Println("File is available locally.")
 				} else {
 
 					sendSocketMessage(REQUEST_SERVER+FLAG_SEPARATOR+fileName, sock)
@@ -262,7 +265,7 @@ func main() {
 		json.Unmarshal(bytes, &fileNameToLocation)
 	}
 
-	sock, err := net.Dial("tcp", "127.0.0.1:8000")
+	sock, err := net.Dial("tcp", "192.168.43.15:8000")
 
 	if err != nil {
 		fmt.Println("An error occured, couldn't connect")

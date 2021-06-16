@@ -193,7 +193,7 @@ func cleanUp(sock net.Conn) {
 }
 
 func acceptSockets() {
-	l, _ := net.Listen("tcp", "127.0.0.1:8000")
+	l, _ := net.Listen("tcp", ":8000")
 
 	for {
 		sock, _ := l.Accept()
